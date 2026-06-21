@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스페인어 학습 앱</title>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #f4f7f6; color: #333; text-align: center; margin: 0; padding: 20px; }
+        #app { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); min-height: 400px; display: flex; flex-direction: column; justify-content: center; }
+        h1, h2, h3 { color: #2c3e50; }
+        button { background-color: #3498db; color: white; border: none; padding: 12px 20px; margin: 10px; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        button:hover { background-color: #2980b9; }
+        .option-btn { display: block; width: 100%; background-color: #ecf0f1; color: #333; margin-bottom: 10px; }
+        .option-btn:hover { background-color: #bdc3c7; }
+        .correct { background-color: #2ecc71 !important; color: white; }
+        .wrong { background-color: #e74c3c !important; color: white; }
+        .hidden { display: none !important; }
+        .card { font-size: 24px; font-weight: bold; padding: 40px; background: #fff3cd; border-radius: 10px; margin-bottom: 20px; }
+        .meaning { font-size: 18px; color: #555; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="screen-container"></div>
+</div>
+
+<script>
+    // 1. 단어 및 문장 데이터베이스 (총 8개)
+    const database = [
+        { es: "hola", kr: "안녕", sentence_es: "___, ¿cómo estás?", sentence_kr: "안녕, 어떻게 지내?", options: ["hola", "adiós", "gracias"] },
+        { es: "gracias", kr: "감사합니다", sentence_es: "Muchas ___ por tu ayuda.", sentence_kr: "도와주셔서 감사합니다.", options: ["gracias", "por favor", "perdón"] },
+        { es: "amigo", kr: "친구", sentence_es: "Él es mi mejor ___.", sentence_kr: "그는 나의 가장 친한 친구야.", options: ["amigo", "enemigo", "hermano"] },
+        { es: "agua", kr: "물", sentence_es: "Quiero beber ___.", sentence_kr: "나는 물을 마시고 싶어.", options: ["agua", "fuego", "tierra"] },
+        { es: "casa", kr: "집", sentence_es: "Voy a mi ___.", sentence_kr: "나는 내 집으로 간다.", options: ["casa", "escuela", "calle"] },
+        { es: "tiempo", kr: "시간", sentence_es: "No tengo mucho ___.", sentence_kr: "나는 시간이 많지 않아.", options: ["tiempo", "dinero", "espacio"] },
+        { es: "feliz", kr: "행복한", sentence_es: "Estoy muy ___ hoy.", sentence_kr: "나는 오늘 매우 행복해.", options: ["feliz", "triste", "enojado"] },
+        { es: "grande", kr: "큰", sentence_es: "Esa casa es muy ___.", sentence_kr: "저 집은 매우 크다.", options: ["grande", "pequeño", "alto"] }
+    ];
+
+    let currentPhase = ""; 
+    let wordCount = 0;
+    let sentenceCount = 0;
+    let currentIdx = 0;
+    let score = 0;
+    
+    let studyWords = [];
+    let studySentences = [];
+    let wrongWords = [];
+    let wrongSentences = [];
+    let relearnQueue = [];
+
+    const container = document.getElementById("screen-container");
+
+    // 초기 화면 (난이도 선택)
+    function showDifficultySelection() {
+        container.innerHTML = `
+            <h2>스페인어 학습을 시작합니다! 🇪🇸</h2>
+            <p>난이도를 선택해주세요.</p>
+            <button onclick="startLearning('초급', 3, 3)">초급 (단어3/문장3)</button>
+            <button onclick="startLearning('중급', 5, 7)">중급 (단어5/문장7)</button>
+            <button onclick="startLearning('고급', 8, 8)">고급 (단어8/문장8)</button>
+        `;
+    }
+
+    // 학습 시작 세팅
+    function startLearning(level, wCount, sCount) {
+        wordCount = wCount;
+        sentenceCount = sCount;
+        
+        // 데이터 섞기
+        let shuffled = [...database].sort(() => 0.5 - Math.random());
+        studyWords = shuffled.slice(0, wordCount);
+        studySentences = shuffled.slice(0, sentenceCount);
+        
+        score = 0;
+        wrongWords = [];
+        wrongSentences = [];
+        currentIdx = 0;
+        
+        showWordStudy();
+    }
+
+    // 단어 카드 학습 (스페인어 -> 한글 뜻 제공)
+    function showWordStudy() {
+        if (currentIdx >= studyWords.length) {
+            currentIdx = 0;
+            showWordQuiz();
+            return;
+        }
+        let word = studyWords[currentIdx];
+        container.innerHTML = `
+            <h2>단어 카드 학습 (${currentIdx + 1}/${wordCount})</h2>
+            <div class="card">
+                <div>${word.es}</div>
+                <div class="meaning">${word.kr}</div>
+            </div>
+            <button onclick="currentIdx++; showWordStudy();">다음 단어</button>
+        `;
+    }
+
+    // 단어 퀴즈
+    function showWordQuiz() {
+        if (currentIdx >= studyWords.length) {
+            currentIdx = 0;
+            showSentenceQuiz();
+            return;
+        }
+
+        let word = studyWords[currentIdx];
+        let isEsToKr = Math.random() > 0.5; // 무작위 언어 출제
+        let question = isEsToKr ? word.es : word.kr;
+        let correctAnswer = isEsToKr ? word.kr : word.es;
+        
+        // 오답지 생성
+        let options = [correctAnswer];
+        while(options.length < 3) {
+            let randomWord = database[Math.floor(Math.random() * database.length)];
+            let wrongOption = isEsToKr ? randomWord.kr : randomWord.es;
+            if(!options.includes(wrongOption)) options.push(wrongOption);
+        }
+        options.sort(() => 0.5 - Math.random()); // 보기 섞기
+
+        renderQuiz("단어 퀴즈", question, options, correctAnswer, (isCorrect) => {
+            if (isCorrect) {
+                score++;
+            } else {
+                wrongWords.push(word);
+            }
+            setTimeout(() => { currentIdx++; showWordQuiz(); }, 1500);
+        });
+    }
+
+    // 문장 빈칸 채우기
+    function showSentenceQuiz() {
+        if (currentIdx >= studySentences.length) {
+            showResult();
+            return;
+        }
+
+        let sentenceObj = studySentences[currentIdx];
+        let options = [...sentenceObj.options].sort(() => 0.5 - Math.random());
+
+        renderQuiz("문장 빈칸 채우기", sentenceObj.sentence_es + "<br><span style='font-size:16px; color:#666;'>(" + sentenceObj.sentence_kr + ")</span>", options, sentenceObj.es, (isCorrect) => {
+            if (isCorrect) {
+                score++;
+            } else {
+                wrongSentences.push(sentenceObj);
+            }
+            setTimeout(() => { currentIdx++; showSentenceQuiz(); }, 1500);
+        });
+    }
+
+    // 퀴즈 렌더링 공통 함수 (단어/문장)
+    function renderQuiz(title, questionText, options, correctAnswer, callback) {
+        let html = `<h2>${title}</h2><div class="card" style="font-size:20px;">${questionText}</div><div id="options">`;
+        options.forEach(opt => {
+            html += `<button class="option-btn" onclick="checkAnswer(this, '${opt}', '${correctAnswer}')">${opt}</button>`;
+        });
+        html += `</div>`;
+        container.innerHTML = html;
+
+        window.checkAnswer = function(btn, selected, correct) {
+            let buttons = document.querySelectorAll(".option-btn");
+            buttons.forEach(b => b.disabled = true); // 중복 클릭 방지
+
+            if (selected === correct) {
+                btn.classList.add("correct");
+                callback(true);
+            } else {
+                btn.classList.add("wrong");
+                // 정답 강조
+                buttons.forEach(b => {
+                    if (b.innerText === correct) b.classList.add("correct");
+                });
+                callback(false);
+            }
+        };
+    }
+
+    // 결과 채점 화면
+    function showResult() {
+        let totalQuestions = wordCount + sentenceCount;
+        container.innerHTML = `
+            <h2>학습 결과 📊</h2>
+            <p>총 ${totalQuestions}문제 중 <strong>${score}</strong>점을 획득했습니다!</p>
+            <p>틀린 단어: ${wrongWords.length}개 / 틀린 문장: ${wrongSentences.length}개</p>
+            ${(wrongWords.length > 0 || wrongSentences.length > 0) 
+                ? `<button onclick="startRelearning()">오답 재학습 시작</button>` 
+                : `<button onclick="showDifficultySelection()">처음으로 돌아가기</button> <p>🎉 완벽합니다!</p>`}
+        `;
+    }
+
+    // 오답 재학습 세팅
+    function startRelearning() {
+        // 단어와 문장 오답을 타입 태그와 함께 섞기
+        relearnQueue = [];
+        wrongWords.forEach(w => relearnQueue.push({ type: 'word', data: w }));
+        wrongSentences.forEach(s => relearnQueue.push({ type: 'sentence', data: s }));
+        relearnQueue.sort(() => 0.5 - Math.random());
+        
+        processRelearnQueue();
+    }
+
+    // 오답 재학습 진행 (틀리면 맞을 때까지 반복)
+    function processRelearnQueue() {
+        if (relearnQueue.length === 0) {
+            container.innerHTML = `
+                <h2>오답 학습 완료! 🎉</h2>
+                <p>모든 오답을 마스터했습니다.</p>
+                <button onclick="showDifficultySelection()">처음으로 돌아가기</button>
+            `;
+            return;
+        }
+
+        let currentItem = relearnQueue[0];
+        
+        if (currentItem.type === 'word') {
+            let word = currentItem.data;
+            let isEsToKr = Math.random() > 0.5;
+            let question = isEsToKr ? word.es : word.kr;
+            let correctAnswer = isEsToKr ? word.kr : word.es;
+            
+            let options = [correctAnswer];
+            while(options.length < 3) {
+                let randomWord = database[Math.floor(Math.random() * database.length)];
+                let wrongOption = isEsToKr ? randomWord.kr : randomWord.es;
+                if(!options.includes(wrongOption)) options.push(wrongOption);
+            }
+            options.sort(() => 0.5 - Math.random());
+
+            renderQuiz("[오답 재학습] 단어", question, options, correctAnswer, (isCorrect) => {
+                if (isCorrect) {
+                    relearnQueue.shift(); // 맞추면 큐에서 제거
+                }
+                setTimeout(processRelearnQueue, 1500); // 틀리면 제거 안 하고 다시 나옴
+            });
+
+        } else {
+            let sentenceObj = currentItem.data;
+            let options = [...sentenceObj.options].sort(() => 0.5 - Math.random());
+
+            renderQuiz("[오답 재학습] 문장", sentenceObj.sentence_es, options, sentenceObj.es, (isCorrect) => {
+                if (isCorrect) {
+                    relearnQueue.shift(); // 맞추면 큐에서 제거
+                }
+                setTimeout(processRelearnQueue, 1500); // 틀리면 제거 안 하고 다시 나옴
+            });
+        }
+    }
+
+    // 앱 시작
+    showDifficultySelection();
+</script>
+
+</body>
+</html>
